@@ -5,7 +5,15 @@
 #define COMPILER "gcc"
 #define STANDARD "c23"
 #define DEBUG true
-#define OUT_NAME "build/lilsockets"
+
+#define PROJECT_NAME "lilsockets"
+
+#define OUT_NAME "build/" PROJECT_NAME
+
+// The project directory containing header files
+#define INCLUDE_DIR "./include/"
+// The directory where header files should be moved to after installation
+#define INSTALL_INCLUDE_DIR "/usr/include/"
 
 #define LIB_PTHREAD "pthread"
 
@@ -18,9 +26,16 @@ static void visit_entry(struct file_entry entry) {
   cmd_appendf(&cmd, "%s", entry.path);
 }
 
+static void lib_install(void);
+
 int main(int argc, char **argv) {
   // Remove old build files
   remove_dir_recursive("build", false);
+
+  if (arg_eq(argc, argv, 1, "install")) {
+    lib_install();
+    return 0;
+  }
 
   // The compiler to use
   cmd_appendf(&cmd, COMPILER);
@@ -53,4 +68,21 @@ int main(int argc, char **argv) {
   if (arg_eq(argc, argv, 1, "r")) {
     systemf("./" OUT_NAME);
   }
+}
+
+static void copy_lib_header_file(struct file_entry file) {
+  char dest_file_buf[256];
+  sprintf(dest_file_buf, INSTALL_INCLUDE_DIR "/%s", file.name);
+  copy_file(file.path, dest_file_buf);
+}
+
+static void lib_install(void) {
+  if (geteuid() != 0) {
+    fprintf(stderr, "Please run the install step with sudo.\n");
+    exit(EXIT_FAILURE);
+  }
+
+  make_dirs(INSTALL_INCLUDE_DIR, 0755);
+
+  walk_dir(INCLUDE_DIR, copy_lib_header_file);
 }
